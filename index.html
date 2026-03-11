@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>SmartHome Elite - Full Interactive</title>
+    <style>
+        :root {
+            --bg: #0b1118; --side: #10151d; --card: #1c222d;
+            --accent: #6366f1; --success: #10b981; --warning: #f59e0b; --text: #ffffff; --dim: #94a3b8; --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background: var(--bg); color: var(--text); overflow: hidden; height: 100vh; }
+        .app-grid { display: grid; grid-template-columns: 260px 1fr; height: 100vh; }
+
+        /* САЙДБАР */
+        .sidebar { background: var(--side); padding: 30px; border-right: 1px solid rgba(255,255,255,0.05); }
+        .logo { font-size: 24px; font-weight: 800; color: var(--accent); margin-bottom: 40px; display: flex; align-items: center; gap: 10px; }
+        .nav-link {
+            background: transparent; border: none; color: var(--dim); padding: 14px 18px; 
+            text-align: left; cursor: pointer; border-radius: 14px; font-size: 15px; width: 100%; margin-bottom: 5px;
+            display: flex; align-items: center; gap: 12px; transition: 0.2s;
+        }
+        .nav-link.active { background: var(--accent); color: white; }
+        .nav-link:hover:not(.active) { background: rgba(255,255,255,0.05); color: white; }
+
+        /* КОНТЕНТ */
+        .main-view { overflow-y: auto; padding: 40px; scroll-behavior: smooth; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        
+        .user-top-btn {
+            display: flex; align-items: center; gap: 10px; padding: 6px 15px; border-radius: 50px; 
+            background: var(--card); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: 0.3s;
+        }
+        .user-top-btn:hover { background: #252f3f; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+        .card { background: var(--card); border-radius: 24px; padding: 25px; border: 1px solid rgba(255,255,255,0.03); position: relative; }
+
+        /* ЭЛЕМЕНТЫ */
+        .btn-fill { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 12px; cursor: pointer; width: 100%; font-weight: 600; transition: 0.2s; }
+        .btn-setting { background: #252f3f; color: white; border: none; padding: 14px; border-radius: 12px; cursor: pointer; text-align: left; margin-bottom: 10px; width: 100%; font-size: 14px; }
+        
+        .set-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #2a2f3a; align-items: center; }
+        .toggle { width: 42px; height: 22px; background: #333; border-radius: 20px; position: relative; cursor: pointer; transition: 0.3s; }
+        .toggle.on { background: var(--success); }
+        .toggle::after { content:''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: 0.3s; }
+        .toggle.on::after { left: 22px; }
+        
+        input[type="range"] { accent-color: #3b82f6; width: 100%; height: 6px; cursor: pointer; margin-top: 15px; }
+
+        /* ГРАФИК */
+        .stat-bar-container { display: flex; align-items: flex-end; gap: 10px; height: 150px; margin-top: 20px; }
+        .stat-bar { flex: 1; background: var(--accent); border-radius: 5px 5px 0 0; transition: 0.5s; position: relative; min-height: 5px; }
+
+        /* КАМЕРЫ */
+        .cam-feed { background: #000; height: 180px; border-radius: 15px; position: relative; overflow: hidden; border: 1px solid #222; }
+        .cam-label { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 5px; font-size: 10px; }
+        .rec-dot { width: 8px; height: 8px; background: var(--danger); border-radius: 50%; animation: blink 1s infinite; }
+
+        /* МОДАЛКИ */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-box { background: #fff; color: #000; padding: 30px; border-radius: 20px; width: 400px; text-align: center; }
+        .modal-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; outline: none; }
+        
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .view-sec { display: none; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div id="m-notif" class="modal-overlay">
+    <div class="modal-box">
+        <h2 id="nt-title">Уведомление</h2>
+        <p id="nt-text" style="color: #444; margin: 15px 0;"></p>
+        <button class="btn-fill" style="background:#0052cc; border-radius: 25px;" onclick="closeM('m-notif')">Понятно</button>
+    </div>
+</div>
+
+<div id="m-profile" class="modal-overlay">
+    <div class="modal-box">
+        <h2>Редактировать профиль</h2>
+        <input type="text" id="edit-name" class="modal-input" placeholder="Имя">
+        <input type="text" id="edit-role" class="modal-input" placeholder="Роль">
+        <button class="btn-fill" onclick="saveProfile()">Сохранить</button>
+        <button class="btn-fill" style="background:#ccc; color:#000; margin-top:10px" onclick="closeM('m-profile')">Отмена</button>
+    </div>
+</div>
+
+<div class="app-grid">
+    <aside class="sidebar">
+        <div class="logo">🏠 SmartHome</div>
+        <button class="nav-link active" onclick="showS('home', this)">📊 Главная</button>
+        <button class="nav-link" onclick="showS('rooms', this)">🛋️ Комнаты</button>
+        <button class="nav-link" onclick="showS('cam', this)">📹 Камеры</button>
+        <button class="nav-link" onclick="showS('stats', this)">📈 Статистика</button>
+        <button class="nav-link" onclick="showS('security', this)">🛡️ Охрана</button>
+        <button class="nav-link" onclick="showS('sets', this)">⚙️ Настройки</button>
+    </aside>
+
+    <main class="main-view">
+        <div class="header">
+            <h2 id="page-title">Главная</h2>
+            <div class="user-top-btn" onclick="editProfile()">
+                <div style="text-align: right">
+                    <div id="u-name" style="font-size: 13px; font-weight: 700;">Александр В.</div>
+                    <div id="u-role" style="font-size: 11px; color: var(--dim);">Владелец</div>
+                </div>
+                <div id="u-avatar" style="width:32px; height:32px; background:#4f46e5; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px;">AL</div>
+            </div>
+        </div>
+
+        <div id="v-home" class="view-sec" style="display:block">
+            <div class="grid">
+                <div class="card">
+                    <h3>🌡️ Климат</h3>
+                    <h1 id="t-display" style="font-size: 48px; margin: 10px 0;">22°C</h1>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-fill" style="background:#252f3f" onclick="setT(18)">Эко</button>
+                        <button class="btn-fill" onclick="setT(22)">Авто</button>
+                        <button class="btn-fill" style="background:var(--warning); color:#000" onclick="setT(28)">Турбо</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>🎶 Музыка</h3>
+                    <p id="song-title" style="font-size: 12px; color: var(--dim); margin-bottom:10px">Файл не выбран</p>
+                    <audio id="player" controls style="width: 100%; height: 32px; filter: invert(1);"></audio>
+                    <input type="file" id="music-upload" hidden accept="audio/*">
+                    <button class="btn-fill" style="background:rgba(255,255,255,0.05); border:1px solid #444; margin-top:10px;" onclick="document.getElementById('music-upload').click()">+ Загрузить музыку</button>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--accent)">
+                    <h4>🎬 Сценарий: Кино</h4>
+                    <p style="font-size:12px; color:var(--dim); margin: 10px 0;">Свет 5%, шторы закрыты, ТВ включен.</p>
+                    <button class="btn-fill" onclick="pop('Сценарий', 'Режим кино активирован')">Запустить</button>
+                </div>
+                <div class="card" style="border-left: 4px solid var(--success)">
+                    <h4>🏃 Сценарий: Уход</h4>
+                    <p style="font-size:12px; color:var(--dim); margin: 10px 0;">Выключить всё, активировать датчики.</p>
+                    <button class="btn-fill" style="background:var(--success)" onclick="pop('Сценарий', 'Дом переведен в режим охраны')">Запустить</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-rooms" class="view-sec">
+            <div class="grid">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <h3>🛋️ Гостиная</h3>
+                        <span style="font-size: 12px; color: var(--success)">• ТВ Активен</span>
+                    </div>
+                    <p id="val-r1" style="margin-top:10px">Свет: 80%</p>
+                    <input type="range" oninput="updRange(this, 'val-r1')" value="80">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px;">
+                        <button class="btn-setting" style="margin:0; font-size: 12px;" onclick="pop('ТВ', 'Apple TV включен')">📺 Apple TV</button>
+                        <button class="btn-setting" style="margin:0; font-size: 12px;" onclick="pop('Шторы', 'Шторы закрыты на 100%')">↔️ Шторы</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🍳 Кухня</h3>
+                    <p id="val-r2">Свет: Выкл</p>
+                    <input type="range" oninput="updRange(this, 'val-r2')" value="0">
+                    <div class="set-row">
+                        <span style="font-size: 13px;">🔥 Теплый пол</span>
+                        <div class="toggle on"></div>
+                    </div>
+                    <div class="set-row">
+                        <span style="font-size: 13px;">☕ Кофемашина</span>
+                        <button class="btn-fill" style="width: auto; padding: 5px 15px; font-size: 11px;" onclick="pop('Кофе', 'Начинаю приготовление Капучино...')">Пуск</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>🛏️ Спальня</h3>
+                    <p id="val-r3">Свет: 40%</p>
+                    <input type="range" oninput="updRange(this, 'val-r3')" value="40">
+                    <div class="set-row">
+                        <span style="font-size: 13px;">🌙 Ночник (RGB)</span>
+                        <input type="color" value="#6366f1" style="background:none; border:none; width:30px; height:30px; cursor:pointer">
+                    </div>
+                    <div class="set-row">
+                        <span style="font-size: 13px;">🌡️ Одеяло с подогревом</span>
+                        <div class="toggle"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <h3>🧒 Детская</h3>
+                        <div style="text-align: right">
+                            <div style="font-size: 18px; font-weight: bold; color: var(--accent)">💧 55%</div>
+                            <div style="font-size: 10px; color: var(--dim)">Влажность</div>
+                        </div>
+                    </div>
+                    <p id="val-r4">Свет: 100%</p>
+                    <input type="range" oninput="updRange(this, 'val-r4')" value="100">
+                    <button class="btn-fill" style="margin-top:10px; background: #3b82f6" onclick="pop('Увлажнитель', 'Режим «Лес» активирован')">🌬️ Очистка воздуха</button>
+                </div>
+
+                <div class="card">
+                    <h3>🚿 Ванная</h3>
+                    <p id="val-r5">Свет: 50%</p>
+                    <input type="range" oninput="updRange(this, 'val-r5')" value="50">
+                    <div class="set-row">
+                        <span style="font-size: 13px;">🛁 Набрать ванну (38°C)</span>
+                        <div class="toggle"></div>
+                    </div>
+                    <div class="set-row">
+                        <span style="font-size: 13px;">🎶 Музыка в душе</span>
+                        <div class="toggle on"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <h3>🖥️ Кабинет</h3>
+                        <span style="font-size: 11px; padding: 2px 8px; background: #333; border-radius: 10px;">PC: Online</span>
+                    </div>
+                    <p id="val-r6">Свет: 20%</p>
+                    <input type="range" oninput="updRange(this, 'val-r6')" value="20">
+                    <div style="margin-top: 15px;">
+                        <button class="btn-setting" style="margin-bottom: 5px;" onclick="pop('Компьютер', 'Сигнал Wake-on-LAN отправлен')">⚡ Включить ПК</button>
+                        <button class="btn-setting" style="background: var(--accent)" onclick="pop('Режим работы', 'Концентрация: уведомления на паузе, свет холодный')">💼 Режим «Работа»</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-cam" class="view-sec">
+            <div class="grid">
+                <div class="card"><h3>📷 Вход</h3><div class="cam-feed" style="background:url('https://belwood.kz/upload/iblock/d9f/k17tzui7xka4f3ymckkv66si5xgbzav8.png') center/cover"><div class="cam-label"><span class="rec-dot"></span> LIVE</div></div></div>
+                <div class="card"><h3>📷 Гостиная</h3><div class="cam-feed" style="background:url('https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=400&q=60') center/cover"><div class="cam-label">LIVE</div></div></div>
+                <div class="card"><h3>📷 Кухня</h3><div class="cam-feed" style="background:url('https://arline.ru/upload/iblock/cdc/fpb78inkn5okwmqvrqpbgic5gnninir6.jpeg') center/cover"><div class="cam-label">LIVE</div></div></div>
+                <div class="card"><h3>📷 Двор</h3><div class="cam-feed" style="background:url('https://idei.club/uploads/posts/2021-11/1636644824_1-idei-club-p-planirovka-dvora-chastnogo-doma-s-garazhom-2.jpg') center/cover"><div class="cam-label"><span class="rec-dot"></span> LIVE</div></div></div>
+                <div class="card"><h3>📷 Гараж</h3><div class="cam-feed" style="background:url('https://kz.ruplans.ru/cms_files/98/184/5170/vid1.jpg') center/cover"><div class="cam-label">LIVE</div></div></div>
+                <div class="card"><h3>📷 Холл</h3><div class="cam-feed" style="background:url('https://rehouz.info/wp-content/uploads/2025/03/4.jpg') center/cover"><div class="cam-label">LIVE</div></div></div>
+            </div>
+        </div>
+
+        <div id="v-stats" class="view-sec">
+            <div class="grid">
+                <div class="card" style="grid-column: span 2;">
+                    <h3>📈 Потребление (кВт/ч)</h3>
+                    <div class="stat-bar-container">
+                        <div class="stat-bar" style="height: 40%"></div><div class="stat-bar" style="height: 70%"></div><div class="stat-bar" style="height: 55%"></div>
+                        <div class="stat-bar" style="height: 85%"></div><div class="stat-bar" style="height: 30%"></div><div class="stat-bar" style="height: 60%"></div>
+                        <div class="stat-bar" style="height: 95%"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>⚡ Статус</h3>
+                    <h1 style="color:var(--success); margin:20px 0">1.2 кВт/ч</h1>
+                    <p style="color:var(--dim)">На 15% меньше, чем вчера</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-security" class="view-sec">
+            <div class="grid">
+                <div class="card">
+                    <h3>🛡️ Периметр</h3>
+                    <div class="set-row"><span>Главная дверь</span><span style="color:var(--success)">Закрыто</span></div>
+                    <div class="set-row"><span>Окна 1 этаж</span><span style="color:var(--success)">Закрыто</span></div>
+                    <div class="set-row"><span>Гаражные ворота</span><span style="color:var(--warning)">Открыто</span></div>
+                    <button class="btn-fill" style="margin-top:15px" onclick="pop('Охрана', 'Все входы заблокированы')">Закрыть всё</button>
+                </div>
+                <div class="card">
+                    <h3>🚨 Датчики</h3>
+                    <div class="set-row"><span>Датчик дыма</span><div class="toggle on"></div></div>
+                    <div class="set-row"><span>Датчик движения</span><div class="toggle on"></div></div>
+                    <div class="set-row"><span>Датчик протечки</span><div class="toggle"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-sets" class="view-sec">
+            <div class="grid">
+                <div class="card">
+                    <h3>💾 Система и Память</h3>
+                    <div style="margin-top: 15px;">
+                        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--dim); margin-bottom:5px">
+                            <span>Память (Записи камер)</span>
+                            <span>842 ГБ / 1 ТБ</span>
+                        </div>
+                        <div style="width:100%; height:8px; background:#333; border-radius:10px; overflow:hidden">
+                            <div style="width:84%; height:100%; background:var(--accent)"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <div class="set-row"><span>Версия ПО</span><span style="color:var(--success)">4.1.2-stable</span></div>
+                        <button class="btn-fill" style="margin-top:10px;" onclick="pop('Обновление', 'Система актуальна. Следующая проверка через 24ч.')">🔄 Проверить обновления</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <h3>🧹 Робот-пылесос</h3>
+                        <span style="font-size:12px; color:var(--success)">🔋 92%</span>
+                    </div>
+                    <p style="font-size:12px; color:var(--dim); margin: 5px 0 15px;">Статус: На зарядке</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button class="btn-setting" style="margin:0; text-align:center" onclick="pop('Пылесос', 'Робот отправлен на полную уборку')">🏠 Уборка</button>
+                        <button class="btn-setting" style="margin:0; text-align:center" onclick="pop('Пылесос', 'Робот моет полы на кухне')">🧼 Мойка</button>
+                    </div>
+                    <button class="btn-fill" style="margin-top:10px; background:#252f3f" onclick="pop('Пылесос', 'Робот возвращается на базу')">🔌 На базу</button>
+                </div>
+
+                <div class="card">
+                    <h3>🎙️ Голосовой помощник</h3>
+                    <div class="set-row">
+                        <span>Чувствительность</span>
+                        <select style="background:#252f3f; color:white; border:none; padding:5px; border-radius:5px; outline:none">
+                            <option>Высокая</option>
+                            <option selected>Средняя</option>
+                            <option>Низкая</option>
+                        </select>
+                    </div>
+                    <div class="set-row">
+                        <span>Голос (Лика)</span>
+                        <div class="toggle on"></div>
+                    </div>
+                    <button class="btn-setting" style="margin-top:10px" onclick="pop('Ассистент', 'Режим обучения запущен. Скажите: «Привет, Дом»')">🎓 Обучить командам</button>
+                </div>
+
+                <div class="card">
+                    <h3>📱 Связь и Доступ</h3>
+                    <div class="set-row"><span>Push-уведомления</span><div class="toggle on"></div></div>
+                    <div class="set-row"><span>Отчет на почту</span><div class="toggle"></div></div>
+                    <button class="btn-setting" style="margin-top:10px; border: 1px solid var(--danger); background:none; color:var(--danger)" onclick="pop('ОПАСНОСТЬ', 'Все данные будут удалены. Вы уверены?')">⚠️ Сброс до заводских</button>
+                </div>
+
+                <div class="card" style="grid-column: span 2;">
+                    <h3>📜 Журнал последних действий</h3>
+                    <div style="max-height: 150px; overflow-y: auto; margin-top: 15px; font-size: 13px;">
+                        <div class="set-row" style="border:none; padding: 5px 0;"><span style="color:var(--dim)">22:15</span><span>Входная дверь открыта (Александр В.)</span></div>
+                        <div class="set-row" style="border:none; padding: 5px 0;"><span style="color:var(--dim)">21:40</span><span>Сценарий «Кино» активирован</span></div>
+                        <div class="set-row" style="border:none; padding: 5px 0;"><span style="color:var(--dim)">19:02</span><span>Обнаружено движение: Задний двор</span></div>
+                        <div class="set-row" style="border:none; padding: 5px 0;"><span style="color:var(--dim)">18:30</span><span>Робот-пылесос завершил уборку</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<script>
+    // Навигация
+    function showS(id, btn) {
+        document.querySelectorAll('.view-sec').forEach(v => v.style.display = 'none');
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        document.getElementById('v-' + id).style.display = 'block';
+        btn.classList.add('active');
+        document.getElementById('page-title').innerText = btn.innerText;
+    }
+
+    // Модалки
+    function openM(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeM(id) { document.getElementById(id).style.display = 'none'; }
+    function pop(title, text) {
+        document.getElementById('nt-title').innerText = title;
+        document.getElementById('nt-text').innerText = text;
+        openM('m-notif');
+    }
+
+    // Температура
+    function setT(v) { document.getElementById('t-display').innerText = v + '°C'; }
+
+    // Свет (Range)
+    function updRange(el, id) {
+        let val = el.value;
+        document.getElementById(id).innerText = val == 0 ? "Свет: Выкл" : "Свет: " + val + "%";
+    }
+
+    // Музыка
+    document.getElementById('music-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            document.getElementById('player').src = url;
+            document.getElementById('song-title').innerText = "Играет: " + file.name;
+            document.getElementById('player').play();
+        }
+    });
+
+    // Переключатели
+    document.addEventListener('click', function(e) {
+        if(e.target.classList.contains('toggle')) e.target.classList.toggle('on');
+    });
+
+    // РЕДАКТИРОВАНИЕ ПРОФИЛЯ
+    function editProfile() {
+        document.getElementById('edit-name').value = document.getElementById('u-name').innerText;
+        document.getElementById('edit-role').value = document.getElementById('u-role').innerText;
+        openM('m-profile');
+    }
+
+    function saveProfile() {
+        let newName = document.getElementById('edit-name').value;
+        let newRole = document.getElementById('edit-role').value;
+        
+        if(newName) {
+            document.getElementById('u-name').innerText = newName;
+            // Обновляем аватар (первые две буквы)
+            document.getElementById('u-avatar').innerText = newName.substring(0, 2).toUpperCase();
+        }
+        if(newRole) document.getElementById('u-role').innerText = newRole;
+        
+        closeM('m-profile');
+    }
+</script>
+</body>
+</html>
